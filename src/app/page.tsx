@@ -644,6 +644,14 @@ export default function Page() {
             >
               911 GT3 RS Experience
             </motion.span>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.0, duration: 0.8 }}
+              className="text-[8px] sm:text-[9px] text-white/40 uppercase tracking-[0.2em] font-mono text-center max-w-xs mt-4 leading-relaxed font-light select-none px-4"
+            >
+              Note: Scroll smoothly to explore telemetry. Allow a brief moment to buffer the cinematic feeds.
+            </motion.p>
           </motion.div>
         </motion.div>
       )}
