@@ -51,7 +51,7 @@ const configPackages = [
   { name: "Weissach Lightweight Package (Carbon CFRP Elements)", price: 31250 }
 ];
 
-// High-Performance viewport-virtualized Blob video player
+// High-Performance progressive video player (renamed to .bin to bypass IDM interception)
 interface LazyBlobVideoProps {
   src: string;
   poster: string;
@@ -66,6 +66,7 @@ interface LazyBlobVideoProps {
   visibleViewportIds: string[];
   isTouchDevice: boolean;
   alwaysAutoplay?: boolean;
+  priority?: boolean;
 }
 
 function LazyBlobVideo({
@@ -81,76 +82,50 @@ function LazyBlobVideo({
   viewportId,
   visibleViewportIds,
   isTouchDevice,
-  alwaysAutoplay = false
+  alwaysAutoplay = false,
+  priority = false
 }: LazyBlobVideoProps) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
   const isInViewport = visibleViewportIds.includes(viewportId);
-
-  useEffect(() => {
-    if (!isInViewport) return;
-    if (blobUrl) return;
-
-    let active = true;
-    const timer = setTimeout(() => {
-      fetch(src, { priority: "low" } as any)
-        .then((res) => {
-          if (!res.ok) throw new Error("Fetch failed");
-          return res.blob();
-        })
-        .then((blob) => {
-          if (active) {
-            const url = URL.createObjectURL(blob);
-            setBlobUrl(url);
-          }
-        })
-        .catch((err) => console.error("Lazy video loading failed:", err));
-    }, 450); // 450ms debounce to filter out fast scrolls
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [src, isInViewport, blobUrl]);
-
-  useEffect(() => {
-    return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
-    };
-  }, [blobUrl]);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const forceAutoplay = alwaysAutoplay || isTouchDevice;
-
-  // Clean the caller's className of layout flow overrides and force absolute layering
   const cleanClassName = className.replace(/\b(block|relative)\b/g, "").trim();
   const mediaClass = `absolute inset-0 ${cleanClassName}`;
 
+  // Video is visible if:
+  // 1. It is configured to autoplay (e.g. mobile/alwaysAutoplay) and is ready.
+  // 2. Or if it is hovered and is ready.
+  const showVideo = forceAutoplay ? isLoaded : (isHovered && isLoaded);
+
   return (
-    <div className="absolute inset-0 w-full h-full overflow-hidden" style={style}>
+    <div 
+      className="absolute inset-0 w-full h-full overflow-hidden" 
+      style={style}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <img
         src={poster}
         alt="Porsche preview frame"
         className={`${mediaClass} transition-opacity duration-500 z-0 ${
-          forceAutoplay
-            ? (isLoaded && blobUrl ? "opacity-0" : "opacity-100")
-            : "group-hover:opacity-0 opacity-100"
+          showVideo ? "opacity-0" : "opacity-100"
         }`}
       />
-      {isInViewport && blobUrl && (
+      {(isInViewport || priority) && (
         <video
           ref={videoRef}
-          src={blobUrl}
+          src={src}
           muted={muted}
           loop={loop}
           playsInline={playsInline}
           autoPlay={autoPlay || forceAutoplay}
+          preload="auto"
+          onCanPlay={() => setIsLoaded(true)}
+          onPlaying={() => setIsLoaded(true)}
           onCanPlayThrough={() => setIsLoaded(true)}
           className={`${mediaClass} transition-opacity duration-500 z-10 ${
-            forceAutoplay
-              ? (isLoaded ? "opacity-100" : "opacity-0")
-              : "opacity-0 group-hover:opacity-100"
+            showVideo ? "opacity-100" : "opacity-0"
           }`}
         />
       )}
@@ -544,7 +519,7 @@ export default function Page() {
 
   // Unified Viewport Intersection Observer for lazy-mounting video decoders
   useEffect(() => {
-    if (!isMounted || isLoading) return;
+    if (!isMounted) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -571,7 +546,7 @@ export default function Page() {
     return () => {
       observer.disconnect();
     };
-  }, [isMounted, isLoading]);
+  }, [isMounted]);
 
   // Hover-to-play utility
   const handleVideoHover = (ref: React.RefObject<HTMLVideoElement | null>, isHovered: boolean, videoId?: string) => {
@@ -703,7 +678,7 @@ export default function Page() {
               <div className="absolute inset-0 w-full h-full">
                 {isMounted && (
                   <LazyBlobVideo
-                    src="/videos/body-paint.mp4"
+                    src="/videos/body-paint.bin"
                     poster="/images/paint/ezgif-frame-001.jpg"
                     className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                     videoRef={heroPaintVideoRef}
@@ -713,6 +688,7 @@ export default function Page() {
                     viewportId="hero-paint"
                     visibleViewportIds={visibleViewportIds}
                     isTouchDevice={isTouchDevice}
+                    priority={true}
                   />
                 )}
               </div>
@@ -743,7 +719,7 @@ export default function Page() {
               <div className="absolute inset-0 w-full h-full">
                 {isMounted && (
                   <LazyBlobVideo
-                    src="/videos/360-view.mp4"
+                    src="/videos/360-view.bin"
                     poster="/images/turntable/ezgif-frame-260.jpg"
                     className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                     videoRef={hero360VideoRef}
@@ -753,6 +729,7 @@ export default function Page() {
                     viewportId="hero-360"
                     visibleViewportIds={visibleViewportIds}
                     isTouchDevice={isTouchDevice}
+                    priority={true}
                   />
                 )}
               </div>
@@ -783,7 +760,7 @@ export default function Page() {
               <div className="absolute inset-0 w-full h-full">
                 {isMounted && (
                   <LazyBlobVideo
-                    src="/videos/intro-racing.mp4"
+                    src="/videos/intro-racing.bin"
                     poster="/images/racing/ezgif-frame-001.jpg"
                     className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                     videoRef={heroRacingVideoRef}
@@ -793,6 +770,7 @@ export default function Page() {
                     viewportId="hero-racing"
                     visibleViewportIds={visibleViewportIds}
                     isTouchDevice={isTouchDevice}
+                    priority={true}
                   />
                 )}
               </div>
@@ -845,7 +823,7 @@ export default function Page() {
               <div className="absolute inset-0 w-full h-full">
                 {isMounted && (
                   <LazyBlobVideo
-                    src="/videos/exploded-view.mp4"
+                    src="/videos/exploded-view.bin"
                     poster="/images/explosion/ezgif-frame-200.jpg"
                     className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                     videoRef={gridExplodedVideoRef}
@@ -899,7 +877,7 @@ export default function Page() {
               <div className="absolute inset-0 w-full h-full">
                 {isMounted && (
                   <LazyBlobVideo
-                    src="/videos/emotional-2.mp4"
+                    src="/videos/emotional-2.bin"
                     poster="/images/nature/ezgif-frame-150.jpg"
                     className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                     videoRef={gridTrackVideoRef}
@@ -950,7 +928,7 @@ export default function Page() {
               <div className="absolute inset-0 w-full h-full">
                 {isMounted && (
                   <LazyBlobVideo
-                    src="/videos/cockpit-1.mp4"
+                    src="/videos/cockpit-1.bin"
                     poster="/images/cockpit/ezgif-frame-150.jpg"
                     className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                     videoRef={gridCockpitVideoRef}
@@ -1004,7 +982,7 @@ export default function Page() {
               <div className="absolute inset-0 w-full h-full">
                 {isMounted && (
                   <LazyBlobVideo
-                    src="/videos/cockpit-2.mp4"
+                    src="/videos/cockpit-2.bin"
                     poster="/images/cockpit-alt/ezgif-frame-150.jpg"
                     className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                     videoRef={gridCabinVideoRef}
@@ -1064,7 +1042,7 @@ export default function Page() {
           <div className="absolute inset-0 w-full h-full z-0">
             {isMounted && (
               <LazyBlobVideo
-                src="/videos/launch-0-100.mp4"
+                src="/videos/launch-0-100.bin"
                 poster="/images/launch/ezgif-frame-001.jpg"
                 className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                 muted={activeAudioVideo !== "launch-0-100"}
@@ -1190,7 +1168,7 @@ export default function Page() {
           >
             {isMounted && (
               <LazyBlobVideo
-                src="/videos/aero-rim.mp4"
+                src="/videos/aero-rim.bin"
                 poster="/images/aerodynamics/ezgif-frame-048.jpg"
                 className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                 muted={activeAudioVideo !== "aero-rim"}
@@ -1412,7 +1390,7 @@ export default function Page() {
             >
               {isMounted && (
                 <LazyBlobVideo
-                  src="/videos/crankshaft.mp4"
+                  src="/videos/crankshaft.bin"
                   poster="/images/crankshaft/ezgif-frame-001.jpg"
                   className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                   videoRef={crankshaftVideoRef}
@@ -1439,7 +1417,7 @@ export default function Page() {
             >
               {isMounted && (
                 <LazyBlobVideo
-                  src="/videos/piston-hud.mp4"
+                  src="/videos/piston-hud.bin"
                   poster="/images/piston/ezgif-frame-120.jpg"
                   className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                   muted={activeAudioVideo !== "piston-hud"}
@@ -1546,7 +1524,7 @@ export default function Page() {
             >
               {isMounted && (
                 <LazyBlobVideo
-                  src="/videos/headlights.mp4"
+                  src="/videos/headlights.bin"
                   poster="/images/headlight/ezgif-frame-263.jpg"
                   className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                   muted={activeAudioVideo !== "headlights"}
@@ -1563,7 +1541,7 @@ export default function Page() {
           </div>
         </section>
 
-        {/* ORDER ENTRY / CONFIGURATOR FULL-SCREEN HERO (Unique emotional-cta-1.mp4 usage) */}
+        {/* ORDER ENTRY / CONFIGURATOR FULL-SCREEN HERO (Unique emotional-cta-1.bin usage) */}
         <section
           ref={containerConfigure}
           id="configure-section"
@@ -1575,7 +1553,7 @@ export default function Page() {
           <div className="absolute inset-0 w-full h-full z-0">
             {isMounted && (
               <LazyBlobVideo
-                src="/videos/emotional-cta-1.mp4"
+                src="/videos/emotional-cta-1.bin"
                 poster="/images/lifestyle/ezgif-frame-001.jpg"
                 className="absolute inset-0 w-full h-full object-cover scale-[1.07]"
                 muted={activeAudioVideo !== "emotional-cta-1"}

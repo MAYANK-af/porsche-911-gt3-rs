@@ -57,7 +57,7 @@ def main():
     # --- BATCH 2: Upload videos one at a time ---
     videos_dir = os.path.join(out_dir, "videos")
     if os.path.isdir(videos_dir):
-        video_files = sorted(glob.glob(os.path.join(videos_dir, "*.mp4")) + glob.glob(os.path.join(videos_dir, "*.webm")))
+        video_files = sorted(glob.glob(os.path.join(videos_dir, "*.mp4")) + glob.glob(os.path.join(videos_dir, "*.webm")) + glob.glob(os.path.join(videos_dir, "*.bin")))
         total = len(video_files)
         print(f"\n[4/5] Uploading {total} video files (one per commit)...")
         
